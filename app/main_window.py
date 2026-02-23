@@ -6,7 +6,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox, QPushButton, QStackedWidget, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox, QPushButton, QStackedWidget, QToolButton, QVBoxLayout, QWidget
 
 from app.pages.admin_machines_page import AdminMachinesPage
 from app.pages.admin_catalog_pages import CompaniesPage, ExtraPage, ModemsPage, UsersPage
@@ -62,18 +62,18 @@ class MainWindow(QMainWindow):
         self.photo_label.setFixedSize(26, 26)
         self._fill_photo()
 
-        profile_btn = QToolButton()
-        profile_btn.setText(f"{_to_initials(session.full_name)}\n{session.role}")
-        profile_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-        profile_btn.setPopupMode(QToolButton.InstantPopup)
-        profile_btn.setObjectName('topbarProfileBtn')
+        self.profile_btn = QToolButton()
+        self.profile_btn.setText(f"{_to_initials(session.full_name)}\n{session.role}")
+        self.profile_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.profile_btn.setPopupMode(QToolButton.InstantPopup)
+        self.profile_btn.setObjectName('topbarProfileBtn')
 
-        profile_menu = QMenu(profile_btn)
+        profile_menu = QMenu(self.profile_btn)
         profile_menu.addAction(QAction('Мой профиль', self, triggered=self._show_profile))
         profile_menu.addAction(QAction('Мои сессии', self, triggered=self._show_my_sessions))
         profile_menu.addSeparator()
-        profile_menu.addAction(QAction('Выход', self, triggered=self.close))
-        profile_btn.setMenu(profile_menu)
+        profile_menu.addAction(QAction('Выход', self, triggered=self._logout))
+        self.profile_btn.setMenu(profile_menu)
 
         top.addWidget(logo_label)
         top.addSpacing(8)
@@ -84,7 +84,7 @@ class MainWindow(QMainWindow):
         top.addWidget(crumb)
         top.addSpacing(24)
         top.addWidget(self.photo_label)
-        top.addWidget(profile_btn)
+        top.addWidget(self.profile_btn)
         layout.addWidget(topbar)
 
         body = QHBoxLayout()
@@ -119,10 +119,25 @@ class MainWindow(QMainWindow):
 
         self._on_menu('dashboard')
 
+    def _refresh_session_ui(self):
+        """Обновить отображение после входа под другим пользователем."""
+        self.photo_label.clear()
+        self._fill_photo()
+        self.profile_btn.setText(f"{_to_initials(session.full_name)}\n{session.role}")
+        self.is_admin = session.role == 'admin'
+        self.sidebar.set_admin_visible(self.is_admin)
+
+    def _logout(self):
+        from app.dialogs.login_dialog import LoginDialog
+        self.hide()
+        login = LoginDialog()
+        if login.exec():
+            self._refresh_session_ui()
+            self.show()
+        else:
+            QApplication.quit()
+
     def _fill_photo(self):
-        placeholder = QPixmap(26, 26)
-        placeholder.fill(Qt.lightGray)
-        pix = placeholder
         raw = session.photo_base64
         if raw:
             try:
@@ -131,9 +146,14 @@ class MainWindow(QMainWindow):
                 loaded = QPixmap()
                 if loaded.loadFromData(decoded):
                     pix = loaded.scaled(26, 26, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+                    self.photo_label.setPixmap(pix)
+                    self.photo_label.setText('')
+                    return
             except Exception:
                 pass
-        self.photo_label.setPixmap(pix)
+        self.photo_label.setPixmap(QPixmap())
+        self.photo_label.setText('🇷🇺')
+        self.photo_label.setStyleSheet('font-size:18px;')
 
     def _on_menu(self, key: str):
         if key not in self.pages:

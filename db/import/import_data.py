@@ -9,7 +9,6 @@ from pathlib import Path
 import openpyxl
 
 from core.db import db_cursor
-from core.security import hash_password
 from core.settings import settings
 
 UUID_RE = re.compile(r"^[0-9a-fA-F-]{36}$")
@@ -82,13 +81,15 @@ def import_users(import_dir: Path):
         with db_cursor(commit=True) as cur:
             cur.execute(
                 """
-                INSERT INTO users (id, full_name, email, phone, role, password_hash, is_active)
-                VALUES (%s, %s, %s, %s, %s, %s, TRUE)
+                INSERT INTO users (id, full_name, email, phone, role, password_hash, is_active, password_plain)
+                VALUES (%s, %s, %s, %s, %s, %s, TRUE, %s)
                 ON CONFLICT (id) DO UPDATE SET
                     full_name = EXCLUDED.full_name,
                     email = EXCLUDED.email,
                     phone = EXCLUDED.phone,
-                    role = EXCLUDED.role
+                    role = EXCLUDED.role,
+                    password_hash = EXCLUDED.password_hash,
+                    password_plain = EXCLUDED.password_plain
                 """,
                 (
                     data["id"],
@@ -96,7 +97,8 @@ def import_users(import_dir: Path):
                     data.get("email") or f"{data['id']}@local",
                     data.get("phone"),
                     role,
-                    hash_password("password123"),
+                    "123",
+                    "123",
                 ),
             )
             cur.execute(

@@ -21,16 +21,25 @@ def delete_company(company_id: str) -> None:
 
 def list_users() -> list[dict]:
     with db_cursor() as cur:
-        cur.execute('SELECT id, full_name, email, phone, role, is_active FROM users ORDER BY created_at DESC')
+        cur.execute(
+            'SELECT id, full_name, email, phone, role, is_active, password_plain FROM users ORDER BY created_at DESC'
+        )
         return [dict(r) for r in cur.fetchall()]
 
 
-def add_user(full_name: str, email: str, phone: str, role: str, password_hash: str) -> None:
+def add_user(full_name: str, email: str, phone: str, role: str, password: str | None = None) -> None:
+    """Новый пользователь: пароль берётся из DEFAULT в БД (123), либо передан явно."""
     with db_cursor(commit=True) as cur:
-        cur.execute(
-            'INSERT INTO users(full_name, email, phone, role, password_hash, is_active) VALUES (%s, %s, %s, %s, %s, TRUE)',
-            (full_name, email, phone, role, password_hash),
-        )
+        if password is not None:
+            cur.execute(
+                'INSERT INTO users(full_name, email, phone, role, password_hash, is_active, password_plain) VALUES (%s, %s, %s, %s, %s, TRUE, %s)',
+                (full_name, email, phone, role, password, password),
+            )
+        else:
+            cur.execute(
+                'INSERT INTO users(full_name, email, phone, role, is_active) VALUES (%s, %s, %s, %s, TRUE)',
+                (full_name, email, phone, role),
+            )
 
 
 def update_user(user_id: str, full_name: str, email: str, phone: str, role: str, is_active: bool) -> None:

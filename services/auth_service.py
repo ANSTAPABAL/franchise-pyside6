@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from core.db import db_cursor
-from core.security import create_access_token, verify_password
+from core.security import create_access_token
 
 
 def authenticate(email: str, password: str):
     with db_cursor() as cur:
         cur.execute(
             '''
-            SELECT u.id, u.full_name, u.email, u.role, u.password_hash, up.photo_base64
+            SELECT u.id, u.full_name, u.email, u.role, u.password_plain, up.photo_base64
             FROM users u
             LEFT JOIN user_profiles up ON up.user_id = u.id
             WHERE lower(u.email) = lower(%s) AND u.is_active = TRUE
@@ -19,7 +19,8 @@ def authenticate(email: str, password: str):
 
     if not row:
         return None
-    if not verify_password(password, row['password_hash']):
+    stored = (row.get('password_plain') or row.get('password_hash') or '').strip()
+    if not stored or password != stored:
         return None
 
     token = create_access_token(str(row['id']), row['role'])

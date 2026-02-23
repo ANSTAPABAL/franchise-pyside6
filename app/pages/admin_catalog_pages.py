@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QComboBox, QHeaderView, QHBoxLayout, QInputDialog, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
-from core.security import hash_password
 from services.admin_service import (
     add_company,
     add_modem,
@@ -87,8 +86,8 @@ class UsersPage(QWidget):
         controls.addWidget(add_btn); controls.addWidget(del_btn); controls.addStretch(1)
         root.addLayout(controls)
 
-        self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(['id', 'ФИО', 'email', 'phone', 'role', 'active'])
+        self.table = QTableWidget(0, 7)
+        self.table.setHorizontalHeaderLabels(['id', 'ФИО', 'email', 'phone', 'role', 'active', 'Пароль'])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.itemChanged.connect(self._on_item_changed)
@@ -102,7 +101,7 @@ class UsersPage(QWidget):
         try:
             self._rows_cache = list_users()
             self.table.setRowCount(len(self._rows_cache))
-            cols = ['id', 'full_name', 'email', 'phone', 'role', 'is_active']
+            cols = ['id', 'full_name', 'email', 'phone', 'role', 'is_active', 'password_plain']
             for r, row in enumerate(self._rows_cache):
                 for c, key in enumerate(cols):
                     if c == 4:  # role — выпадающий список
@@ -113,7 +112,7 @@ class UsersPage(QWidget):
                         combo.currentTextChanged.connect(lambda val, rr=r: self._on_role_changed(rr, val))
                         self.table.setCellWidget(r, c, combo)
                     else:
-                        self.table.setItem(r, c, QTableWidgetItem(str(row[key])))
+                        self.table.setItem(r, c, QTableWidgetItem(str(row.get(key, ''))))
         finally:
             self._skip_item_changed = False
 
@@ -135,13 +134,13 @@ class UsersPage(QWidget):
             QMessageBox.critical(self, 'Ошибка', str(exc))
 
     def _on_item_changed(self, item: QTableWidgetItem):
-        if self._skip_item_changed or item.column() == 4:
+        if self._skip_item_changed or item.column() == 4 or item.column() == 6:
             return
         row = item.row()
         if row >= len(self._rows_cache):
             return
         rec = dict(self._rows_cache[row])
-        cols = ['id', 'full_name', 'email', 'phone', 'role', 'is_active']
+        cols = ['id', 'full_name', 'email', 'phone', 'role', 'is_active', 'password_plain']
         key = cols[item.column()]
         new_val = item.text()
         if key == 'is_active':
@@ -170,7 +169,7 @@ class UsersPage(QWidget):
         email, ok = QInputDialog.getText(self, 'Пользователь', 'Email:')
         if not (ok and email.strip()):
             return
-        add_user(full_name.strip(), email.strip(), '', 'operator', hash_password('password123'))
+        add_user(full_name.strip(), email.strip(), '', 'operator')
         self.refresh()
 
     def _delete(self):

@@ -81,3 +81,21 @@ FROM vending_machines m
 CROSS JOIN (SELECT id, price FROM products) p
 CROSS JOIN generate_series(0, 13) AS d(d)
 CROSS JOIN generate_series(1, 3) AS _(n);
+
+-- Продажи за 17–27 февраля текущего года для блока «Динамика продаж за последние 10 дней»
+INSERT INTO sales (machine_id, product_id, quantity, amount, sold_at, payment_method_id)
+SELECT
+    m.id,
+    p.id,
+    (1 + (random() * 4)::int),
+    (1 + (random() * 4)::int) * p.price,
+    (d.day + (random() * 12)::int * interval '1 hour'),
+    (1 + floor(random() * 3)::int)::smallint
+FROM vending_machines m
+CROSS JOIN (SELECT id, price FROM products) p
+CROSS JOIN generate_series(
+    (extract(year from current_date)::text || '-02-17')::date,
+    (extract(year from current_date)::text || '-02-27')::date,
+    '1 day'::interval
+) AS d(day)
+CROSS JOIN generate_series(1, 4) AS _(n);
