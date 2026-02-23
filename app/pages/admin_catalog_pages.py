@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QInputDialog, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QHeaderView, QHBoxLayout, QInputDialog, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from core.security import hash_password
 from services.admin_service import (
@@ -39,6 +39,8 @@ class CompaniesPage(QWidget):
 
         self.table = QTableWidget(0, 3)
         self.table.setHorizontalHeaderLabels(['id', 'name', 'created_at'])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setStretchLastSection(True)
         root.addWidget(self.table)
         self.refresh()
 
@@ -87,6 +89,8 @@ class UsersPage(QWidget):
 
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(['id', 'ФИО', 'email', 'phone', 'role', 'active'])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.itemChanged.connect(self._on_item_changed)
         self._rows_cache: list[dict] = []
         self._skip_item_changed = False
@@ -198,6 +202,8 @@ class ModemsPage(QWidget):
 
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(['id', 'modem_uid', 'provider', 'connection_type', 'created_at'])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setStretchLastSection(True)
         root.addWidget(self.table)
         self.refresh()
 
@@ -245,6 +251,8 @@ class ExtraPage(QWidget):
 
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(['id', 'title', 'body', 'created_at'])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setStretchLastSection(True)
         root.addWidget(self.table)
         self.refresh()
 

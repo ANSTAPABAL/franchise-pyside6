@@ -4,7 +4,7 @@ import csv
 from pathlib import Path
 
 from PySide6.QtGui import QColor, QIcon, QPageLayout, QPageSize, QPdfWriter
-from PySide6.QtWidgets import QComboBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QListWidget, QMessageBox, QPushButton, QStackedLayout, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QFileDialog, QHeaderView, QHBoxLayout, QInputDialog, QLabel, QListWidget, QMessageBox, QPushButton, QStackedLayout, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from app.dialogs.machine_form_dialog import MachineFormDialog
 from services.vending_service import delete_machine, list_company_folders, list_machines, unbind_modem
@@ -60,6 +60,8 @@ class AdminMachinesPage(QWidget):
         self.stack = QStackedLayout()
         self.table = QTableWidget(0, 9)
         self.table.setHorizontalHeaderLabels(['ID', 'Название автомата', 'Модель', 'Компания', 'Модем', 'Адрес / Место', 'В работе с', 'Статус', 'Действия'])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setStretchLastSection(True)
         self.tiles = QListWidget()
 
         table_holder = QWidget(); table_holder.setLayout(QVBoxLayout()); table_holder.layout().addWidget(self.table)
@@ -72,7 +74,7 @@ class AdminMachinesPage(QWidget):
         root.addWidget(stack_widget)
 
         self._empty_label = QLabel('Нет торговых автоматов по заданному фильтру')
-        self._empty_label.setStyleSheet('color:#505050;padding:8px;')
+        self._empty_label.setObjectName('emptyStateLabel')
         self._empty_label.setVisible(False)
         root.addWidget(self._empty_label)
 
@@ -206,7 +208,10 @@ class AdminMachinesPage(QWidget):
             headers = ['id', 'name', 'model', 'company_name', 'modem_uid', 'location', 'commissioned_date', 'status']
             ws.append(headers)
             for r in self.rows:
-                ws.append([r.get('id'), r.get('name'), r.get('model'), r.get('company_name'), r.get('modem_uid') or '—', r.get('location'), r.get('commissioned_date'), r.get('status')])
+                cd = r.get('commissioned_date')
+                if hasattr(cd, 'tzinfo') and getattr(cd, 'tzinfo', None) is not None:
+                    cd = cd.replace(tzinfo=None)
+                ws.append([r.get('id'), r.get('name'), r.get('model'), r.get('company_name'), r.get('modem_uid') or '—', r.get('location'), cd, r.get('status')])
             wb.save(path)
         elif fmt == 'csv':
             with path.open('w', newline='', encoding='utf-8-sig') as file:

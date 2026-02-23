@@ -14,6 +14,17 @@ QFrame#topbar {
     border-bottom: 1px solid #e2e8f0;
 }
 
+QLabel#topbarMenuIcon {
+    color: #64748b;
+    font-size: 10pt;
+}
+
+QToolButton#topbarProfileBtn {
+    color: #334155;
+    font-size: 10pt;
+    border: none;
+}
+
 QLabel#brandLabel {
     color: #1e293b;
     font-size: 14pt;
@@ -133,5 +144,32 @@ QMenu::item {
 
 QMenu::item:selected {
     background-color: #e6eef8;
+}
+
+QLabel#emptyStateLabel {
+    color: #64748b;
+    font-size: 14pt;
+    padding: 8px;
+}
+
+QLabel#cardValueLabel {
+    color: #1e293b;
+    font-size: 12pt;
+    padding: 8px;
+}
+
+QListWidget {
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 10pt;
+    color: #1e293b;
+}
+
+QDialog {
+    background-color: #f8fafc;
+    color: #1e293b;
+    font-family: 'Segoe UI';
+    font-size: 10pt;
 }
 """

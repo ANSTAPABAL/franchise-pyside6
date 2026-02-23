@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtWidgets import QComboBox, QFileDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QFileDialog, QHeaderView, QHBoxLayout, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from services.monitor_service import monitor_rows
 
@@ -71,10 +71,12 @@ class MonitorPage(QWidget):
 
         self.table = QTableWidget(0, 9)
         self.table.setHorizontalHeaderLabels(['#', 'Торговый автомат', 'Связь', 'Загрузка', 'Денежные средства', 'События', 'Оборудование', 'Информация', 'Доп.'])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setStretchLastSection(True)
         root.addWidget(self.table)
 
         self.empty_label = QLabel('')
-        self.empty_label.setStyleSheet('font-size:22px;color:#505050;padding:8px;')
+        self.empty_label.setObjectName('emptyStateLabel')
         root.addWidget(self.empty_label)
 
         self.refresh()

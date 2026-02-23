@@ -39,3 +39,45 @@ VALUES
     ('Запуск нового франчайзи', 'Открыта новая точка в центральном офисном квартале.'),
     ('Плановая инвентаризация', 'Запланирована инвентаризация сети на текущую неделю.')
 ON CONFLICT DO NOTHING;
+
+-- Товары для продаж и учёта
+INSERT INTO products (name, description, price, min_stock, sales_trend)
+VALUES
+    ('Кофе Американо', 'Эспрессо с водой', 80.00, 5, 12.5),
+    ('Капучино', 'Кофе с молоком', 120.00, 5, 18.0),
+    ('Шоколад горячий', 'Горячий шоколад', 90.00, 3, 8.0),
+    ('Печенье', 'Печенье в упаковке', 45.00, 2, 15.0),
+    ('Вода 0.5', 'Питьевая вода', 50.00, 10, 25.0)
+ON CONFLICT DO NOTHING;
+
+-- Остатки по автомату (для учёта ТМЦ)
+INSERT INTO machine_stock (machine_id, product_id, quantity_available)
+SELECT m.id, p.id, 20 + (random() * 30)::int
+FROM vending_machines m
+CROSS JOIN products p
+ON CONFLICT (machine_id, product_id) DO NOTHING;
+
+-- Снимок монитора для отображения в Мониторе ТА
+INSERT INTO machine_monitor_snapshot (machine_id, load_percent, cash_amount, events, equipment_status, updated_at)
+SELECT id, 65.00, 12500.50, 'Нет событий', 'green', NOW()
+FROM vending_machines
+ON CONFLICT (machine_id) DO UPDATE SET
+    load_percent = EXCLUDED.load_percent,
+    cash_amount = EXCLUDED.cash_amount,
+    events = EXCLUDED.events,
+    equipment_status = EXCLUDED.equipment_status,
+    updated_at = EXCLUDED.updated_at;
+
+-- Продажи за последние 14 дней для динамики по quantity/amount (по сумме и по количеству)
+INSERT INTO sales (machine_id, product_id, quantity, amount, sold_at, payment_method_id)
+SELECT
+    m.id,
+    p.id,
+    (1 + (random() * 4)::int),
+    (1 + (random() * 4)::int) * p.price,
+    (CURRENT_TIMESTAMP - (d.d || ' days')::interval + (random() * 14)::int * interval '1 hour'),
+    (1 + floor(random() * 3)::int)::smallint
+FROM vending_machines m
+CROSS JOIN (SELECT id, price FROM products) p
+CROSS JOIN generate_series(0, 13) AS d(d)
+CROSS JOIN generate_series(1, 3) AS _(n);

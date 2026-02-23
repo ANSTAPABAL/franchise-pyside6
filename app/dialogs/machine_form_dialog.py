@@ -79,15 +79,6 @@ class MachineFormDialog(QDialog):
         for label, widget, row, col in fields:
             block = QFormLayout()
             block.addRow(label, widget)
-            holder = QVBoxLayout()
-            holder.addLayout(block)
-            wrap = QVBoxLayout()
-            wrap.addLayout(block)
-            cell = QLabel()
-            dummy = QVBoxLayout()
-            dummy.addLayout(block)
-            container = QLabel()
-            del holder, wrap, cell, dummy, container
             grid.addLayout(block, row, col)
 
         payments = QHBoxLayout()

@@ -110,7 +110,7 @@ class DashboardPage(QWidget):
         card = self._tile_widgets['efficiency']
         self._clear_card(card)
         lbl = QLabel(f'Работающих автоматов: {eff:.2f}%')
-        lbl.setStyleSheet('font-size:20px;padding:8px;')
+        lbl.setObjectName('cardValueLabel')
         card.layout().addWidget(lbl)
 
     def _render_status(self, status: dict):
