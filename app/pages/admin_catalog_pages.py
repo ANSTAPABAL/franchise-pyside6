@@ -66,6 +66,7 @@ class CompaniesPage(QWidget):
             self.refresh()
 
 
+# admin — доступ в Администрирование, всё остальное; operator — без админки, с экспортом Excel; viewer — только просмотр, без кнопок экспорта
 ROLES = ('admin', 'operator', 'viewer')
 
 

@@ -126,6 +126,10 @@ class MainWindow(QMainWindow):
         self.profile_btn.setText(f"{_to_initials(session.full_name)}\n{session.role}")
         self.is_admin = session.role == 'admin'
         self.sidebar.set_admin_visible(self.is_admin)
+        for key in ('monitor', 'reports', 'inventory'):
+            page = self.pages.get(key)
+            if page and hasattr(page, 'refresh_for_session'):
+                page.refresh_for_session()
 
     def _logout(self):
         from app.dialogs.login_dialog import LoginDialog

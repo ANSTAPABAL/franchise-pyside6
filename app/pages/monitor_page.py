@@ -4,6 +4,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QComboBox, QFileDialog, QHeaderView, QHBoxLayout, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
+from app.session import session
 from services.monitor_service import monitor_rows
 
 
@@ -51,13 +52,14 @@ class MonitorPage(QWidget):
 
         apply_btn = QPushButton('Применить')
         clear_btn = QPushButton('Очистить')
-        exp_btn = QPushButton('Скачать Excel')
+        self.exp_btn = QPushButton('Скачать Excel')
         clear_btn.setProperty('variant', 'ghost')
         apply_btn.clicked.connect(self.refresh)
         clear_btn.clicked.connect(self._clear)
-        exp_btn.clicked.connect(self._export_xlsx)
+        self.exp_btn.clicked.connect(self._export_xlsx)
+        self.exp_btn.setVisible(session.role != 'viewer')
 
-        for w in [self.state, self.conn_type, self.extra, self.sort, apply_btn, clear_btn, exp_btn]:
+        for w in [self.state, self.conn_type, self.extra, self.sort, apply_btn, clear_btn, self.exp_btn]:
             filters.addWidget(w)
         root.addLayout(filters)
 
@@ -107,6 +109,9 @@ class MonitorPage(QWidget):
             values = [row['num'], row['tp'], row['connection'], row['load'], row['cash'], row['events'], row['equipment'], row['info'], row['extra']]
             for c, val in enumerate(values):
                 self.table.setItem(r, c, QTableWidgetItem(str(val)))
+
+    def refresh_for_session(self):
+        self.exp_btn.setVisible(session.role != 'viewer')
 
     def _export_xlsx(self):
         if not self._last_rows:

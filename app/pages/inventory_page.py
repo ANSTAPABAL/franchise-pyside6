@@ -5,6 +5,7 @@ from pathlib import Path
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QFileDialog, QHeaderView, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
+from app.session import session
 from services.reports_service import stock_report
 
 
@@ -29,9 +30,10 @@ class InventoryPage(QWidget):
         title.setObjectName('panelTitle')
         root.addWidget(title)
 
-        exp_btn = QPushButton('Скачать Excel')
-        exp_btn.clicked.connect(self._export_xlsx)
-        root.addWidget(exp_btn)
+        self.exp_btn = QPushButton('Скачать Excel')
+        self.exp_btn.clicked.connect(self._export_xlsx)
+        self.exp_btn.setVisible(session.role != 'viewer')
+        root.addWidget(self.exp_btn)
 
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(['Автомат', 'Товар', 'Количество', 'Мин. запас', 'Нужно пополнение', 'machine_id'])
@@ -51,6 +53,9 @@ class InventoryPage(QWidget):
                 if c == 4 and row['need_refill']:
                     item.setBackground(QColor('#ffd2d2'))
                 self.table.setItem(r, c, item)
+
+    def refresh_for_session(self):
+        self.exp_btn.setVisible(session.role != 'viewer')
 
     def _export_xlsx(self):
         if not self._last_rows:

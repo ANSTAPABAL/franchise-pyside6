@@ -4,6 +4,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QFileDialog, QHeaderView, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
+from app.session import session
 from services.reports_service import sales_report
 
 
@@ -42,9 +43,10 @@ class ReportsPage(QWidget):
         title.setObjectName('panelTitle')
         root.addWidget(title)
 
-        exp_btn = QPushButton('Скачать Excel')
-        exp_btn.clicked.connect(self._export_xlsx)
-        root.addWidget(exp_btn)
+        self.exp_btn = QPushButton('Скачать Excel')
+        self.exp_btn.clicked.connect(self._export_xlsx)
+        self.exp_btn.setVisible(session.role != 'viewer')
+        root.addWidget(self.exp_btn)
 
         self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(['ID', 'Дата', 'Сумма', 'Кол-во', 'Товар', 'Автомат', 'Оплата'])
@@ -61,6 +63,9 @@ class ReportsPage(QWidget):
             vals = [row['id'], row['sold_at'], row['amount'], row['quantity'], row['product_name'], row['machine_name'], row['payment_method']]
             for c, val in enumerate(vals):
                 self.table.setItem(r, c, QTableWidgetItem(str(val)))
+
+    def refresh_for_session(self):
+        self.exp_btn.setVisible(session.role != 'viewer')
 
     def _export_xlsx(self):
         if not self._last_rows:
