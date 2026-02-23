@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QHBoxLayout, QInputDialog, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QHBoxLayout, QInputDialog, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from core.security import hash_password
 from services.admin_service import (
@@ -16,6 +16,7 @@ from services.admin_service import (
     list_modems,
     list_news,
     list_users,
+    update_user,
 )
 
 
@@ -64,6 +65,9 @@ class CompaniesPage(QWidget):
             self.refresh()
 
 
+ROLES = ('admin', 'operator', 'viewer')
+
+
 class UsersPage(QWidget):
     def __init__(self):
         super().__init__()
@@ -83,16 +87,77 @@ class UsersPage(QWidget):
 
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(['id', 'ФИО', 'email', 'phone', 'role', 'active'])
+        self.table.itemChanged.connect(self._on_item_changed)
+        self._rows_cache: list[dict] = []
+        self._skip_item_changed = False
         root.addWidget(self.table)
         self.refresh()
 
     def refresh(self):
-        rows = list_users()
-        self.table.setRowCount(len(rows))
+        self._skip_item_changed = True
+        try:
+            self._rows_cache = list_users()
+            self.table.setRowCount(len(self._rows_cache))
+            cols = ['id', 'full_name', 'email', 'phone', 'role', 'is_active']
+            for r, row in enumerate(self._rows_cache):
+                for c, key in enumerate(cols):
+                    if c == 4:  # role — выпадающий список
+                        combo = QComboBox()
+                        combo.addItems(ROLES)
+                        idx = combo.findText(str(row[key]))
+                        combo.setCurrentIndex(max(0, idx))
+                        combo.currentTextChanged.connect(lambda val, rr=r: self._on_role_changed(rr, val))
+                        self.table.setCellWidget(r, c, combo)
+                    else:
+                        self.table.setItem(r, c, QTableWidgetItem(str(row[key])))
+        finally:
+            self._skip_item_changed = False
+
+    def _on_role_changed(self, row: int, role: str):
+        if self._skip_item_changed or row >= len(self._rows_cache):
+            return
+        rec = self._rows_cache[row]
+        try:
+            update_user(
+                rec['id'],
+                rec['full_name'],
+                rec['email'],
+                rec.get('phone') or '',
+                role,
+                rec.get('is_active', True),
+            )
+            self._rows_cache[row] = {**rec, 'role': role}
+        except Exception as exc:
+            QMessageBox.critical(self, 'Ошибка', str(exc))
+
+    def _on_item_changed(self, item: QTableWidgetItem):
+        if self._skip_item_changed or item.column() == 4:
+            return
+        row = item.row()
+        if row >= len(self._rows_cache):
+            return
+        rec = dict(self._rows_cache[row])
         cols = ['id', 'full_name', 'email', 'phone', 'role', 'is_active']
-        for r, row in enumerate(rows):
-            for c, key in enumerate(cols):
-                self.table.setItem(r, c, QTableWidgetItem(str(row[key])))
+        key = cols[item.column()]
+        new_val = item.text()
+        if key == 'is_active':
+            rec['is_active'] = new_val.strip().lower() in ('1', 'true', 'да', 'yes')
+        else:
+            rec[key] = new_val
+        role_w = self.table.cellWidget(row, 4)
+        rec['role'] = role_w.currentText() if role_w else rec.get('role', 'operator')
+        try:
+            update_user(
+                rec['id'],
+                rec['full_name'],
+                rec['email'],
+                rec.get('phone') or '',
+                rec['role'],
+                rec.get('is_active', True),
+            )
+            self._rows_cache[row] = rec
+        except Exception as exc:
+            QMessageBox.critical(self, 'Ошибка', str(exc))
 
     def _add(self):
         full_name, ok = QInputDialog.getText(self, 'Пользователь', 'ФИО:')

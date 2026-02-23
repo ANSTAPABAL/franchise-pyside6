@@ -70,7 +70,7 @@ class MainWindow(QMainWindow):
 
         profile_menu = QMenu(profile_btn)
         profile_menu.addAction(QAction('Мой профиль', self, triggered=self._show_profile))
-        profile_menu.addAction(QAction('Мои сессии', self, triggered=lambda: None))
+        profile_menu.addAction(QAction('Мои сессии', self, triggered=self._show_my_sessions))
         profile_menu.addSeparator()
         profile_menu.addAction(QAction('Выход', self, triggered=self.close))
         profile_btn.setMenu(profile_menu)
@@ -160,4 +160,11 @@ class MainWindow(QMainWindow):
             self,
             'Профиль сотрудника',
             f'ФИО: {session.full_name}\nEmail: {session.email}\nРоль: {session.role}',
+        )
+
+    def _show_my_sessions(self):
+        QMessageBox.information(
+            self,
+            'Мои сессии',
+            f'Текущая сессия:\n\nФИО: {session.full_name}\nEmail: {session.email}\nРоль: {session.role}',
         )

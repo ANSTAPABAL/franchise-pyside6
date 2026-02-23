@@ -71,6 +71,11 @@ class AdminMachinesPage(QWidget):
         stack_widget.setLayout(self.stack)
         root.addWidget(stack_widget)
 
+        self._empty_label = QLabel('Нет торговых автоматов по заданному фильтру')
+        self._empty_label.setStyleSheet('color:#505050;padding:8px;')
+        self._empty_label.setVisible(False)
+        root.addWidget(self._empty_label)
+
         pager = QHBoxLayout()
         prev_btn = QPushButton('<')
         next_btn = QPushButton('>')
@@ -106,8 +111,9 @@ class AdminMachinesPage(QWidget):
 
     def refresh(self):
         try:
+            search_text = self.search.lineEdit().text().strip() if self.search.isEditable() else self.search.currentText().strip()
             self.total, self.rows = list_machines(
-                search=self.search.currentText().strip(),
+                search=search_text,
                 limit=self._limit(),
                 offset=self.offset,
                 company_folder_id=self.company_filter.currentData() or None,
@@ -117,6 +123,7 @@ class AdminMachinesPage(QWidget):
             return
 
         self.count_label.setText(f"Всего найдено {self.total} шт.")
+        self._empty_label.setVisible(self.total == 0)
         self._render_table()
         self._render_tiles()
 
@@ -125,7 +132,7 @@ class AdminMachinesPage(QWidget):
         for r, row in enumerate(self.rows):
             vals = [
                 row['id'], row['name'], row.get('model') or '', row.get('company_name') or '',
-                row.get('modem_uid') or '-1', row.get('location') or '', str(row.get('commissioned_date') or ''), row.get('status') or ''
+                row.get('modem_uid') or '—', row.get('location') or '', str(row.get('commissioned_date') or ''), row.get('status') or ''
             ]
             for c, val in enumerate(vals):
                 item = QTableWidgetItem(str(val))
@@ -149,7 +156,7 @@ class AdminMachinesPage(QWidget):
     def _render_tiles(self):
         self.tiles.clear()
         for row in self.rows:
-            self.tiles.addItem(f"{row['name']}\n{row.get('model') or ''}\n{row.get('company_name') or ''}\nМодем: {row.get('modem_uid') or '-1'}")
+            self.tiles.addItem(f"{row['name']}\n{row.get('model') or ''}\n{row.get('company_name') or ''}\nМодем: {row.get('modem_uid') or '—'}")
 
     def _add_machine(self):
         dlg = MachineFormDialog()
@@ -181,7 +188,7 @@ class AdminMachinesPage(QWidget):
         self.refresh()
 
     def _export_menu(self):
-        fmt, ok = QInputDialog.getItem(self, 'Экспорт', 'Формат', ['csv', 'pdf', 'html'], 0, False)
+        fmt, ok = QInputDialog.getItem(self, 'Экспорт', 'Формат', ['xlsx', 'csv', 'pdf', 'html'], 0, False)
         if not ok:
             return
         self._export(fmt)
@@ -191,10 +198,22 @@ class AdminMachinesPage(QWidget):
         if not out:
             return
         path = Path(out)
-        if fmt == 'csv':
+        if fmt == 'xlsx':
+            from openpyxl import Workbook
+            wb = Workbook()
+            ws = wb.active
+            ws.title = 'Торговые автоматы'
+            headers = ['id', 'name', 'model', 'company_name', 'modem_uid', 'location', 'commissioned_date', 'status']
+            ws.append(headers)
+            for r in self.rows:
+                ws.append([r.get('id'), r.get('name'), r.get('model'), r.get('company_name'), r.get('modem_uid') or '—', r.get('location'), r.get('commissioned_date'), r.get('status')])
+            wb.save(path)
+        elif fmt == 'csv':
             with path.open('w', newline='', encoding='utf-8-sig') as file:
                 writer = csv.DictWriter(file, fieldnames=['id', 'name', 'model', 'company_name', 'modem_uid', 'location', 'commissioned_date', 'status'])
-                writer.writeheader(); writer.writerows(self.rows)
+                writer.writeheader()
+                for r in self.rows:
+                    writer.writerow({k: (v if k != 'modem_uid' else (v or '—')) for k, v in r.items()})
         elif fmt == 'html':
             rows = ''.join(
                 f"<tr><td>{r['id']}</td><td>{r['name']}</td><td>{r.get('model') or ''}</td><td>{r.get('company_name') or ''}</td></tr>"
@@ -216,7 +235,7 @@ class AdminMachinesPage(QWidget):
             for r in self.rows:
                 content.append(
                     f"<tr><td>{r['id']}</td><td>{r['name']}</td><td>{r.get('model') or ''}</td>"
-                    f"<td>{r.get('company_name') or ''}</td><td>{r.get('modem_uid') or '-1'}</td>"
+                    f"<td>{r.get('company_name') or ''}</td><td>{r.get('modem_uid') or '—'}</td>"
                     f"<td>{r.get('location') or ''}</td><td>{r.get('status') or ''}</td></tr>"
                 )
             content.append('</table>')

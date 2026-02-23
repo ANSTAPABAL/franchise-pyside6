@@ -33,6 +33,14 @@ def add_user(full_name: str, email: str, phone: str, role: str, password_hash: s
         )
 
 
+def update_user(user_id: str, full_name: str, email: str, phone: str, role: str, is_active: bool) -> None:
+    with db_cursor(commit=True) as cur:
+        cur.execute(
+            'UPDATE users SET full_name = %s, email = %s, phone = %s, role = %s, is_active = %s WHERE id = %s',
+            (full_name, email, phone, role, is_active, user_id),
+        )
+
+
 def delete_user(user_id: str) -> None:
     with db_cursor(commit=True) as cur:
         cur.execute('DELETE FROM users WHERE id = %s', (user_id,))

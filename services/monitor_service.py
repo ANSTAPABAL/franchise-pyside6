@@ -23,7 +23,7 @@ def monitor_rows(state: str | None, connection_type: str | None, extra_status: s
         SELECT
             ROW_NUMBER() OVER (ORDER BY m.name) AS num,
             m.name AS tp,
-            COALESCE(md.provider, 'N/A') AS connection,
+            COALESCE(NULLIF(TRIM(md.provider), ''), '—') AS connection,
             ROUND(COALESCE(ms.load_percent, 0)::numeric, 2) AS load,
             ROUND(COALESCE(ms.cash_amount, 0)::numeric, 2) AS cash,
             COALESCE(ms.events, 'Нет событий') AS events,

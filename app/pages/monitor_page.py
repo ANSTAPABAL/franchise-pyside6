@@ -1,13 +1,28 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from pathlib import Path
+
+from PySide6.QtWidgets import QComboBox, QFileDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from services.monitor_service import monitor_rows
+
+
+def _export_monitor_xlsx(rows: list, path: Path) -> None:
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Монитор ТА'
+    headers = ['№', 'Торговый автомат', 'Связь', 'Загрузка', 'Денежные средства', 'События', 'Оборудование', 'Информация', 'Доп.']
+    ws.append(headers)
+    for r in rows:
+        ws.append([r.get('num'), r.get('tp'), r.get('connection'), r.get('load'), r.get('cash'), r.get('events'), r.get('equipment'), r.get('info'), r.get('extra')])
+    wb.save(path)
 
 
 class MonitorPage(QWidget):
     def __init__(self):
         super().__init__()
+        self._last_rows: list = []
         root = QVBoxLayout(self)
         root.setContentsMargins(14, 12, 14, 12)
 
@@ -18,26 +33,31 @@ class MonitorPage(QWidget):
         filters = QHBoxLayout()
         self.state = QComboBox()
         self.state.addItem('Общее состояние', '')
-        self.state.addItems(['working', 'broken', 'maintenance'])
+        for v in ['working', 'broken', 'maintenance']:
+            self.state.addItem(v, v)
 
         self.conn_type = QComboBox()
         self.conn_type.addItem('Подключение', '')
-        self.conn_type.addItems(['gsm', 'wifi', 'ethernet'])
+        for v in ['gsm', 'wifi', 'ethernet']:
+            self.conn_type.addItem(v, v)
 
         self.extra = QComboBox()
         self.extra.addItem('Дополнительные статусы', '')
-        self.extra.addItems(['attention', 'warning', 'critical'])
+        for v in ['attention', 'warning', 'critical']:
+            self.extra.addItem(v, v)
 
         self.sort = QComboBox()
         self.sort.addItems(['По состоянию ТА'])
 
         apply_btn = QPushButton('Применить')
         clear_btn = QPushButton('Очистить')
+        exp_btn = QPushButton('Скачать Excel')
         clear_btn.setProperty('variant', 'ghost')
         apply_btn.clicked.connect(self.refresh)
         clear_btn.clicked.connect(self._clear)
+        exp_btn.clicked.connect(self._export_xlsx)
 
-        for w in [self.state, self.conn_type, self.extra, self.sort, apply_btn, clear_btn]:
+        for w in [self.state, self.conn_type, self.extra, self.sort, apply_btn, clear_btn, exp_btn]:
             filters.addWidget(w)
         root.addLayout(filters)
 
@@ -79,8 +99,22 @@ class MonitorPage(QWidget):
         if not rows:
             self.empty_label.setText('Нет активных торговых автоматов, соответствующих заданному фильтру')
 
+        self._last_rows = rows
         self.table.setRowCount(len(rows))
         for r, row in enumerate(rows):
             values = [row['num'], row['tp'], row['connection'], row['load'], row['cash'], row['events'], row['equipment'], row['info'], row['extra']]
             for c, val in enumerate(values):
                 self.table.setItem(r, c, QTableWidgetItem(str(val)))
+
+    def _export_xlsx(self):
+        if not self._last_rows:
+            QMessageBox.information(self, 'Экспорт', 'Нет данных для экспорта.')
+            return
+        path, _ = QFileDialog.getSaveFileName(self, 'Скачать Excel', 'monitor_ta.xlsx', 'Excel (*.xlsx)')
+        if not path:
+            return
+        try:
+            _export_monitor_xlsx(self._last_rows, Path(path))
+            QMessageBox.information(self, 'Экспорт', f'Файл сохранён: {path}')
+        except Exception as exc:
+            QMessageBox.critical(self, 'Ошибка', str(exc))

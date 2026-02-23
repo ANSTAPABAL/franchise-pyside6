@@ -23,7 +23,7 @@ def list_machines(search: str = '', limit: int = 20, offset: int = 0, company_fo
             m.serial_number,
             m.model,
             c.name AS company_name,
-            COALESCE(md.modem_uid, '-1') AS modem_uid,
+            md.modem_uid AS modem_uid,
             m.location,
             m.commissioned_date,
             m.status
