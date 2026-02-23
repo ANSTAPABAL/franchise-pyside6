@@ -51,7 +51,7 @@ class MainWindow(QMainWindow):
             logo_label.setPixmap(logo_pix)
 
         menu_btn = QLabel('☰')
-        menu_btn.setStyleSheet('color:#cbd5e1;')
+        menu_btn.setStyleSheet('color:#64748b;')
         brand = QLabel('ООО Торговые Автоматы')
         brand.setObjectName('brandLabel')
         crumb = QLabel('Главная')
@@ -66,7 +66,7 @@ class MainWindow(QMainWindow):
         profile_btn.setText(f"{_to_initials(session.full_name)}\n{session.role}")
         profile_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         profile_btn.setPopupMode(QToolButton.InstantPopup)
-        profile_btn.setStyleSheet('color:#dcdcdc;font-size:14px;border:none;')
+        profile_btn.setStyleSheet('color:#334155;font-size:10pt;border:none;')
 
         profile_menu = QMenu(profile_btn)
         profile_menu.addAction(QAction('Мой профиль', self, triggered=self._show_profile))

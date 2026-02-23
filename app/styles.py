@@ -1,45 +1,47 @@
 APP_STYLESHEET = """
 QMainWindow, QWidget {
-    background-color: #f3f4f6;
-    color: #1f2937;
+    background-color: #f8fafc;
+    color: #1e293b;
     font-family: 'Segoe UI';
     font-size: 10pt;
 }
 
 QFrame#topbar {
-    background-color: #0b1220;
+    background-color: #ffffff;
     min-height: 48px;
     max-height: 48px;
     border: none;
+    border-bottom: 1px solid #e2e8f0;
 }
 
 QLabel#brandLabel {
-    color: #f8fafc;
+    color: #1e293b;
     font-size: 14pt;
     font-weight: 600;
 }
 
 QLabel#crumbLabel {
-    color: #94a3b8;
+    color: #64748b;
     font-size: 10pt;
 }
 
 QFrame#sidebar {
-    background-color: #111827;
+    background-color: #f1f5f9;
     min-width: 240px;
     max-width: 240px;
     border: none;
+    border-right: 1px solid #e2e8f0;
 }
 
 QLabel#sidebarTitle {
-    color: #e5e7eb;
+    color: #475569;
     font-size: 12pt;
     font-weight: 600;
     padding: 14px 14px 8px 14px;
 }
 
 QToolButton#menuButton {
-    color: #e5e7eb;
+    color: #334155;
     font-size: 10pt;
     text-align: left;
     border: none;
@@ -47,12 +49,13 @@ QToolButton#menuButton {
 }
 
 QToolButton#menuButton:hover {
-    background-color: #1f2937;
+    background-color: #e2e8f0;
+    color: #1e293b;
 }
 
 QToolButton#menuButton:checked {
-    background-color: #2563eb;
-    color: #ffffff;
+    background-color: #dbeafe;
+    color: #1d4ed8;
 }
 
 QFrame#panelCard {
