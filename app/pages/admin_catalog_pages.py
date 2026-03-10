@@ -1,25 +1,27 @@
+"""администрирование справочников: компании, пользователи, модемы, новости.
+
+четыре отдельных класса-страницы, каждый отвечает за один справочник.
+все они работают по одному шаблону: таблица + кнопки добавить/удалить.
+"""
+
 from __future__ import annotations
 
-from PySide6.QtWidgets import QComboBox, QHeaderView, QHBoxLayout, QInputDialog, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QComboBox, QHeaderView, QHBoxLayout, QInputDialog, QLabel,
+    QMessageBox, QPushButton, QTableWidget, QTableWidgetItem,
+    QVBoxLayout, QWidget,
+)
 
 from services.admin_service import (
-    add_company,
-    add_modem,
-    add_news,
-    add_user,
-    delete_company,
-    delete_modem,
-    delete_news,
-    delete_user,
-    list_companies,
-    list_modems,
-    list_news,
-    list_users,
+    add_company, add_modem, add_news, add_user,
+    delete_company, delete_modem, delete_news, delete_user,
+    list_companies, list_modems, list_news, list_users,
     update_user,
 )
 
 
 class CompaniesPage(QWidget):
+    """crud-страница для компаний (франчайзи)."""
     def __init__(self):
         super().__init__()
         root = QVBoxLayout(self)
@@ -33,7 +35,9 @@ class CompaniesPage(QWidget):
         del_btn.setProperty('variant', 'ghost')
         add_btn.clicked.connect(self._add)
         del_btn.clicked.connect(self._delete)
-        controls.addWidget(add_btn); controls.addWidget(del_btn); controls.addStretch(1)
+        controls.addWidget(add_btn)
+        controls.addWidget(del_btn)
+        controls.addStretch(1)
         root.addLayout(controls)
 
         self.table = QTableWidget(0, 3)
@@ -44,6 +48,7 @@ class CompaniesPage(QWidget):
         self.refresh()
 
     def refresh(self):
+        """загружает список компаний из бд в таблицу."""
         rows = list_companies()
         self.table.setRowCount(len(rows))
         for r, row in enumerate(rows):
@@ -51,26 +56,38 @@ class CompaniesPage(QWidget):
                 self.table.setItem(r, c, QTableWidgetItem(str(row[key])))
 
     def _add(self):
+        """запрашивает название новой компании через диалог и добавляет в бд."""
         text, ok = QInputDialog.getText(self, 'Новая компания', 'Название:')
         if ok and text.strip():
             add_company(text.strip())
             self.refresh()
 
     def _delete(self):
+        """удаляет выделенную строку после подтверждения.
+
+        currentRow() возвращает -1 если ничего не выбрано — тогда ничего не делаем.
+        """
         row = self.table.currentRow()
         if row < 0:
             return
-        rec_id = self.table.item(row, 0).text()
+        rec_id = self.table.item(row, 0).text()  # id в первой колонке
         if QMessageBox.question(self, 'Подтверждение', 'Удалить компанию?') == QMessageBox.Yes:
             delete_company(rec_id)
             self.refresh()
 
 
-# admin — доступ в Администрирование, всё остальное; operator — без админки, с экспортом Excel; viewer — только просмотр, без кнопок экспорта
+# роли пользователей — admin всё может, operator без admin-раздела, viewer только смотрит
 ROLES = ('admin', 'operator', 'viewer')
 
 
 class UsersPage(QWidget):
+    """crud-страница для пользователей и управления ролями.
+
+    фишка: роль редактируется прямо в таблице через комбобокс в ячейке.
+    остальные поля редактируются в ячейке напрямую — itemChanged ловит изменения.
+    _skip_item_changed нужен чтобы не вызывать update_user пока мы сами
+    заполняем таблицу в refresh().
+    """
     def __init__(self):
         super().__init__()
         root = QVBoxLayout(self)
@@ -84,20 +101,27 @@ class UsersPage(QWidget):
         del_btn.setProperty('variant', 'ghost')
         add_btn.clicked.connect(self._add)
         del_btn.clicked.connect(self._delete)
-        controls.addWidget(add_btn); controls.addWidget(del_btn); controls.addStretch(1)
+        controls.addWidget(add_btn)
+        controls.addWidget(del_btn)
+        controls.addStretch(1)
         root.addLayout(controls)
 
         self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(['id', 'ФИО', 'email', 'phone', 'role', 'active', 'Пароль'])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.itemChanged.connect(self._on_item_changed)
-        self._rows_cache: list[dict] = []
-        self._skip_item_changed = False
+        self.table.itemChanged.connect(self._on_item_changed)  # слушаем правку ячеек
+        self._rows_cache: list[dict] = []  # локальная копия данных для быстрого обновления
+        self._skip_item_changed = False    # флаг: не реагировать на itemChanged при refresh
         root.addWidget(self.table)
         self.refresh()
 
     def refresh(self):
+        """загружает пользователей из бд в таблицу.
+
+        _skip_item_changed = True чтобы itemChanged не срабатывал
+        пока мы заполняем ячейки в цикле.
+        """
         self._skip_item_changed = True
         try:
             self._rows_cache = list_users()
@@ -105,38 +129,38 @@ class UsersPage(QWidget):
             cols = ['id', 'full_name', 'email', 'phone', 'role', 'is_active', 'password_plain']
             for r, row in enumerate(self._rows_cache):
                 for c, key in enumerate(cols):
-                    if c == 4:  # role — выпадающий список
+                    if c == 4:  # колонка role — вставляем комбобокс вместо текста
                         combo = QComboBox()
                         combo.addItems(ROLES)
                         idx = combo.findText(str(row[key]))
                         combo.setCurrentIndex(max(0, idx))
+                        # lambda с rr=r — фиксируем номер строки в замыкании
                         combo.currentTextChanged.connect(lambda val, rr=r: self._on_role_changed(rr, val))
                         self.table.setCellWidget(r, c, combo)
                     else:
                         self.table.setItem(r, c, QTableWidgetItem(str(row.get(key, ''))))
         finally:
-            self._skip_item_changed = False
+            self._skip_item_changed = False  # разрешаем itemChanged снова
 
     def _on_role_changed(self, row: int, role: str):
+        """сохраняет новую роль пользователя при изменении комбобокса."""
         if self._skip_item_changed or row >= len(self._rows_cache):
             return
         rec = self._rows_cache[row]
         try:
-            update_user(
-                rec['id'],
-                rec['full_name'],
-                rec['email'],
-                rec.get('phone') or '',
-                role,
-                rec.get('is_active', True),
-            )
+            update_user(rec['id'], rec['full_name'], rec['email'],
+                        rec.get('phone') or '', role, rec.get('is_active', True))
             self._rows_cache[row] = {**rec, 'role': role}
         except Exception as exc:
             QMessageBox.critical(self, 'Ошибка', str(exc))
 
     def _on_item_changed(self, item: QTableWidgetItem):
+        """сохраняет изменение ячейки в бд (кроме колонок role и password).
+
+        is_active принимает строки вроде '1', 'true', 'да' — любой truthy-текст.
+        """
         if self._skip_item_changed or item.column() == 4 or item.column() == 6:
-            return
+            return  # role и пароль редактируются отдельно
         row = item.row()
         if row >= len(self._rows_cache):
             return
@@ -148,32 +172,29 @@ class UsersPage(QWidget):
             rec['is_active'] = new_val.strip().lower() in ('1', 'true', 'да', 'yes')
         else:
             rec[key] = new_val
+        # берём актуальную роль из комбобокса в ячейке
         role_w = self.table.cellWidget(row, 4)
         rec['role'] = role_w.currentText() if role_w else rec.get('role', 'operator')
         try:
-            update_user(
-                rec['id'],
-                rec['full_name'],
-                rec['email'],
-                rec.get('phone') or '',
-                rec['role'],
-                rec.get('is_active', True),
-            )
+            update_user(rec['id'], rec['full_name'], rec['email'],
+                        rec.get('phone') or '', rec['role'], rec.get('is_active', True))
             self._rows_cache[row] = rec
         except Exception as exc:
             QMessageBox.critical(self, 'Ошибка', str(exc))
 
     def _add(self):
+        """запрашивает фио и email через диалоги и создаёт пользователя."""
         full_name, ok = QInputDialog.getText(self, 'Пользователь', 'ФИО:')
         if not (ok and full_name.strip()):
             return
         email, ok = QInputDialog.getText(self, 'Пользователь', 'Email:')
         if not (ok and email.strip()):
             return
-        add_user(full_name.strip(), email.strip(), '', 'operator')
+        add_user(full_name.strip(), email.strip(), '', 'operator')  # роль по умолчанию operator
         self.refresh()
 
     def _delete(self):
+        """удаляет выбранного пользователя после подтверждения."""
         row = self.table.currentRow()
         if row < 0:
             return
@@ -184,6 +205,7 @@ class UsersPage(QWidget):
 
 
 class ModemsPage(QWidget):
+    """crud-страница для модемов."""
     def __init__(self):
         super().__init__()
         root = QVBoxLayout(self)
@@ -197,7 +219,9 @@ class ModemsPage(QWidget):
         del_btn.setProperty('variant', 'ghost')
         add_btn.clicked.connect(self._add)
         del_btn.clicked.connect(self._delete)
-        controls.addWidget(add_btn); controls.addWidget(del_btn); controls.addStretch(1)
+        controls.addWidget(add_btn)
+        controls.addWidget(del_btn)
+        controls.addStretch(1)
         root.addLayout(controls)
 
         self.table = QTableWidget(0, 5)
@@ -208,6 +232,7 @@ class ModemsPage(QWidget):
         self.refresh()
 
     def refresh(self):
+        """загружает список модемов из бд."""
         rows = list_modems()
         cols = ['id', 'modem_uid', 'provider', 'connection_type', 'created_at']
         self.table.setRowCount(len(rows))
@@ -216,6 +241,7 @@ class ModemsPage(QWidget):
                 self.table.setItem(r, c, QTableWidgetItem(str(row[key])))
 
     def _add(self):
+        """запрашивает uid модема и добавляет запись в бд."""
         uid, ok = QInputDialog.getText(self, 'Модем', 'UID:')
         if not (ok and uid.strip()):
             return
@@ -223,6 +249,7 @@ class ModemsPage(QWidget):
         self.refresh()
 
     def _delete(self):
+        """удаляет выбранный модем после подтверждения."""
         row = self.table.currentRow()
         if row < 0:
             return
@@ -233,6 +260,7 @@ class ModemsPage(QWidget):
 
 
 class ExtraPage(QWidget):
+    """crud-страница для новостей / дополнительных записей."""
     def __init__(self):
         super().__init__()
         root = QVBoxLayout(self)
@@ -246,7 +274,9 @@ class ExtraPage(QWidget):
         del_btn.setProperty('variant', 'ghost')
         add_btn.clicked.connect(self._add)
         del_btn.clicked.connect(self._delete)
-        controls.addWidget(add_btn); controls.addWidget(del_btn); controls.addStretch(1)
+        controls.addWidget(add_btn)
+        controls.addWidget(del_btn)
+        controls.addStretch(1)
         root.addLayout(controls)
 
         self.table = QTableWidget(0, 4)
@@ -257,6 +287,7 @@ class ExtraPage(QWidget):
         self.refresh()
 
     def refresh(self):
+        """загружает новости из бд."""
         rows = list_news()
         self.table.setRowCount(len(rows))
         cols = ['id', 'title', 'body', 'created_at']
@@ -265,9 +296,11 @@ class ExtraPage(QWidget):
                 self.table.setItem(r, c, QTableWidgetItem(str(row[key])))
 
     def _add(self):
+        """запрашивает заголовок и текст новости через два диалога."""
         title, ok = QInputDialog.getText(self, 'Новость', 'Заголовок:')
         if not (ok and title.strip()):
             return
+        # getMultiLineText — многострочный диалог ввода (для текста новости)
         body, ok = QInputDialog.getMultiLineText(self, 'Новость', 'Текст:')
         if not ok:
             return
@@ -275,6 +308,7 @@ class ExtraPage(QWidget):
         self.refresh()
 
     def _delete(self):
+        """удаляет выбранную новость после подтверждения."""
         row = self.table.currentRow()
         if row < 0:
             return

@@ -1,13 +1,32 @@
+"""страница «главная» (dashboard).
+
+показывает 5 плиток: эффективность сети, состояние сети, сводка,
+динамика продаж за 10 дней, новости.
+плитки можно скрывать чекбоксами и перетаскивать мышью.
+"""
+
 from __future__ import annotations
 
 from PySide6.QtCharts import QBarCategoryAxis, QBarSeries, QBarSet, QChart, QChartView, QPieSeries, QValueAxis
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtWidgets import QCheckBox, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QCheckBox, QComboBox, QFrame, QGridLayout, QHBoxLayout,
+    QLabel, QListWidget, QListWidgetItem, QVBoxLayout, QWidget,
+)
 
-from services.dashboard_service import franchise_news, network_efficiency, network_status_breakdown, sales_last_10_days, summary_cards
+from services.dashboard_service import (
+    franchise_news, network_efficiency, network_status_breakdown,
+    sales_last_10_days, summary_cards,
+)
 
 
 class DashboardPage(QWidget):
+    """главная страница с управляемыми плитками и графиками.
+
+    фишка: плитки лежат в QListWidget с setDragDropMode(InternalMove) —
+    это позволяет перетаскивать их мышью без лишнего кода.
+    каждый чекбокс скрывает/показывает нужную плитку через setHidden().
+    """
     def __init__(self):
         super().__init__()
         root = QVBoxLayout(self)
@@ -17,28 +36,32 @@ class DashboardPage(QWidget):
         title.setObjectName('panelTitle')
         root.addWidget(title)
 
+        # выбор метрики для графика продаж
         controls = QHBoxLayout()
         controls.addWidget(QLabel('Динамика:'))
         self.metric_combo = QComboBox()
         self.metric_combo.addItems(['amount', 'quantity'])
-        self.metric_combo.currentTextChanged.connect(self.refresh)
+        self.metric_combo.currentTextChanged.connect(self.refresh)  # при смене — перерисовываем
         controls.addWidget(self.metric_combo)
         controls.addStretch(1)
         root.addLayout(controls)
 
+        # ряд чекбоксов для управления видимостью плиток
         visibility_row = QHBoxLayout()
         visibility_row.addWidget(QLabel('Плитки:'))
         self.tile_toggles: dict[str, QCheckBox] = {}
 
+        # QListWidget в режиме LeftToRight + Wrapping — горизонтальный «поток» плиток
         self.tiles = QListWidget()
-        self.tiles.setDragDropMode(QListWidget.InternalMove)
+        self.tiles.setDragDropMode(QListWidget.InternalMove)  # разрешает перетаскивание
         self.tiles.setFlow(QListWidget.LeftToRight)
-        self.tiles.setWrapping(True)
+        self.tiles.setWrapping(True)     # плитки переносятся на следующую строку
         self.tiles.setResizeMode(QListWidget.Adjust)
         self.tiles.setSpacing(10)
 
-        self._tile_widgets = {}
-        self._tile_items: dict[str, QListWidgetItem] = {}
+        self._tile_widgets = {}           # key → QFrame (карточка)
+        self._tile_items: dict[str, QListWidgetItem] = {}  # key → QListWidgetItem
+
         for key, title_text, size in [
             ('efficiency', 'Эффективность сети', QSize(460, 220)),
             ('status', 'Состояние сети', QSize(460, 220)),
@@ -50,10 +73,11 @@ class DashboardPage(QWidget):
             item.setSizeHint(size)
             card = self._make_card(title_text)
             self.tiles.addItem(item)
-            self.tiles.setItemWidget(item, card)
+            self.tiles.setItemWidget(item, card)  # виджет привязан к элементу списка
             self._tile_widgets[key] = card
             self._tile_items[key] = item
 
+            # чекбокс для скрытия/показа этой плитки
             toggle = QCheckBox(title_text)
             toggle.setChecked(True)
             toggle.toggled.connect(lambda checked, name=key: self._toggle_tile(name, checked))
@@ -64,13 +88,21 @@ class DashboardPage(QWidget):
         root.addLayout(visibility_row)
         root.addWidget(self.tiles)
 
-        self.refresh()
+        self.refresh()  # загружаем данные при первом открытии
 
     def _toggle_tile(self, key: str, visible: bool):
+        """скрывает или показывает плитку по ключу.
+
+        setHidden(True) — скрывает элемент в QListWidget, не удаляя его.
+        """
         item = self._tile_items[key]
         item.setHidden(not visible)
 
     def _make_card(self, title: str) -> QFrame:
+        """создаёт карточку-плитку с заголовком.
+
+        возвращает QFrame с QVBoxLayout внутри — туда потом добавим контент.
+        """
         frame = QFrame()
         frame.setObjectName('panelCard')
         layout = QVBoxLayout(frame)
@@ -80,6 +112,11 @@ class DashboardPage(QWidget):
         return frame
 
     def _clear_card(self, frame: QFrame):
+        """очищает содержимое плитки, сохраняя только заголовок (первый элемент).
+
+        фишка: count() > 1 — элемент с индексом 0 это заголовок, его не трогаем.
+        deleteLater() удаляет qt-виджет отложенно, чтобы не сломать event loop.
+        """
         lay = frame.layout()
         while lay.count() > 1:
             item = lay.takeAt(1)
@@ -88,6 +125,10 @@ class DashboardPage(QWidget):
                 widget.deleteLater()
 
     def refresh(self):
+        """перечитывает данные из сервисов и перерисовывает все плитки.
+
+        если сервис бросил исключение — показываем текст ошибки в каждой плитке.
+        """
         try:
             eff = network_efficiency()
             status = network_status_breakdown()
@@ -107,6 +148,7 @@ class DashboardPage(QWidget):
         self._render_news(news)
 
     def _render_efficiency(self, eff: float):
+        """отображает процент работающих автоматов в плитке «эффективность»."""
         card = self._tile_widgets['efficiency']
         self._clear_card(card)
         lbl = QLabel(f'Работающих автоматов: {eff:.2f}%')
@@ -114,6 +156,11 @@ class DashboardPage(QWidget):
         card.layout().addWidget(lbl)
 
     def _render_status(self, status: dict):
+        """строит круговую диаграмму распределения автоматов по статусам.
+
+        QPieSeries — серия данных для круговой диаграммы.
+        QChart — контейнер графика. QChartView — виджет для отображения.
+        """
         card = self._tile_widgets['status']
         self._clear_card(card)
         series = QPieSeries()
@@ -127,6 +174,7 @@ class DashboardPage(QWidget):
         card.layout().addWidget(QChartView(chart))
 
     def _render_summary(self, summary: dict):
+        """показывает три ключевые цифры в виде сетки: деньги, продажи, обслуживания."""
         card = self._tile_widgets['summary']
         self._clear_card(card)
         grid = QGridLayout()
@@ -143,13 +191,21 @@ class DashboardPage(QWidget):
         card.layout().addWidget(holder)
 
     def _render_sales(self, sales: list[tuple[str, float]]):
+        """строит столбчатый график продаж за 10 дней.
+
+        QBarSet — набор данных одного цвета.
+        QBarSeries — серия с несколькими наборами (у нас один).
+        QBarCategoryAxis — ось X с текстовыми метками (даты).
+        QValueAxis — числовая ось Y.
+        day[5:] — обрезаем год из строки YYYY-MM-DD, оставляем MM-DD.
+        """
         card = self._tile_widgets['sales']
         self._clear_card(card)
 
         bars = QBarSet('Динамика')
         days = []
         for day, value in sales:
-            days.append(day[5:])
+            days.append(day[5:])  # только месяц-день для подписи
             bars.append(value)
         series = QBarSeries()
         series.append(bars)
@@ -170,7 +226,9 @@ class DashboardPage(QWidget):
         card.layout().addWidget(QChartView(chart))
 
     def _render_news(self, news: list[dict]):
+        """отображает последние новости списком (не более 8 штук)."""
         card = self._tile_widgets['news']
         self._clear_card(card)
         for item in news[:8]:
+            # формат даты: ДД.ММ.ГГ + заголовок новости
             card.layout().addWidget(QLabel(f"{item['created_at']:%d.%m.%y}  {item['title']}"))

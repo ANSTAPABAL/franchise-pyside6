@@ -1,15 +1,28 @@
+"""страница «учёт тмц» — остатки товаров в автоматах.
+
+показывает таблицу: автомат, товар, количество, минимальный запас,
+нужно ли пополнение. строки с нехваткой подсвечиваются красным.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
 
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QFileDialog, QHeaderView, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFileDialog, QHeaderView, QLabel, QMessageBox,
+    QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+)
 
 from app.session import session
 from services.reports_service import stock_report
 
 
 def _export_inventory_xlsx(rows: list, path: Path) -> None:
+    """экспортирует таблицу остатков в excel.
+
+    openpyxl импортируется только при вызове — не грузим при старте приложения.
+    """
     from openpyxl import Workbook
     wb = Workbook()
     ws = wb.active
@@ -17,11 +30,15 @@ def _export_inventory_xlsx(rows: list, path: Path) -> None:
     headers = ['Автомат', 'Товар', 'Количество', 'Мин. запас', 'Нужно пополнение', 'machine_id']
     ws.append(headers)
     for r in rows:
-        ws.append([r.get('machine_name'), r.get('product_name'), r.get('quantity_available'), r.get('min_stock'), r.get('need_refill'), r.get('machine_id')])
+        ws.append([
+            r.get('machine_name'), r.get('product_name'), r.get('quantity_available'),
+            r.get('min_stock'), r.get('need_refill'), r.get('machine_id'),
+        ])
     wb.save(path)
 
 
 class InventoryPage(QWidget):
+    """экран контроля остатков и потребности в пополнении."""
     def __init__(self):
         super().__init__()
         self._last_rows: list = []
@@ -36,28 +53,41 @@ class InventoryPage(QWidget):
         root.addWidget(self.exp_btn)
 
         self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(['Автомат', 'Товар', 'Количество', 'Мин. запас', 'Нужно пополнение', 'machine_id'])
+        self.table.setHorizontalHeaderLabels([
+            'Автомат', 'Товар', 'Количество', 'Мин. запас', 'Нужно пополнение', 'machine_id',
+        ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setStretchLastSection(True)
         root.addWidget(self.table)
         self.refresh()
 
     def refresh(self):
+        """загружает остатки и подсвечивает позиции с нехваткой красным цветом.
+
+        фишка: QColor('#ffd2d2') — светло-красный фон ячейки «нужно пополнение».
+        c == 4 — именно эта колонка отвечает за флаг need_refill.
+        """
         self._last_rows = stock_report(500)
         rows = self._last_rows
         self.table.setRowCount(len(rows))
         for r, row in enumerate(rows):
-            vals = [row['machine_name'], row['product_name'], row['quantity_available'], row['min_stock'], row['need_refill'], row['machine_id']]
+            vals = [
+                row['machine_name'], row['product_name'], row['quantity_available'],
+                row['min_stock'], row['need_refill'], row['machine_id'],
+            ]
             for c, val in enumerate(vals):
                 item = QTableWidgetItem(str(val))
+                # подсвечиваем ячейку «нужно пополнение» если флаг True
                 if c == 4 and row['need_refill']:
                     item.setBackground(QColor('#ffd2d2'))
                 self.table.setItem(r, c, item)
 
     def refresh_for_session(self):
+        """обновляет видимость кнопки экспорта при смене пользователя."""
         self.exp_btn.setVisible(session.role != 'viewer')
 
     def _export_xlsx(self):
+        """сохраняет таблицу остатков в .xlsx."""
         if not self._last_rows:
             QMessageBox.information(self, 'Экспорт', 'Нет данных для экспорта.')
             return

@@ -1,3 +1,13 @@
+"""Импорт исходных файлов в PostgreSQL.
+
+Скрипт нужен для первичного наполнения БД данными из папки Import:
+- пользователи,
+- автоматы,
+- товары/остатки,
+- продажи,
+- обслуживания.
+"""
+
 from __future__ import annotations
 
 import csv
@@ -15,6 +25,7 @@ UUID_RE = re.compile(r"^[0-9a-fA-F-]{36}$")
 
 
 def find_import_dir(root_hint: str) -> Path:
+    """Ищет папку `Import`, начиная с указанного корня."""
     root = Path(root_hint) if root_hint else Path.cwd()
     for path in root.rglob("*"):
         if path.is_dir() and path.name.lower() == "import":
@@ -23,6 +34,7 @@ def find_import_dir(root_hint: str) -> Path:
 
 
 def parse_dt(value: str):
+    """Пытается распарсить строку даты/времени в datetime."""
     value = (value or "").strip()
     if not value:
         return None

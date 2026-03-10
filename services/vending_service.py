@@ -1,15 +1,36 @@
+"""сервис crud-операций по торговым автоматам.
+
+вызывается из admin_machines_page.py и machine_form_dialog.py.
+"""
+
 from __future__ import annotations
 
 from core.db import db_cursor
 
 
-def list_machines(search: str = '', limit: int = 20, offset: int = 0, company_folder_id: str | None = None):
+def list_machines(
+    search: str = '',
+    limit: int = 20,
+    offset: int = 0,
+    company_folder_id: str | None = None,
+):
+    """возвращает (total, rows) — общее число записей и одну страницу списка та.
+
+    как работает пагинация:
+    - сначала делаем COUNT(*) с теми же фильтрами — получаем total;
+    - потом делаем SELECT с LIMIT и OFFSET — получаем нужную страницу.
+    фишка: два запроса в одном соединении, поэтому не закрываем и не открываем
+    соединение дважды.
+
+    search — ilike-поиск по имени автомата (регистр не важен).
+    company_folder_id — фильтр по компании.
+    """
     where = ['1=1']
     params: list = []
 
     if search:
         where.append('m.name ILIKE %s')
-        params.append(f'%{search}%')
+        params.append(f'%{search}%')  # % с двух сторон — «содержит»
     if company_folder_id:
         where.append('m.company_id = %s')
         params.append(company_folder_id)
@@ -47,6 +68,7 @@ def list_machines(search: str = '', limit: int = 20, offset: int = 0, company_fo
 
 
 def list_company_folders() -> list[dict]:
+    """справочник компаний для выпадающего фильтра на странице та."""
     with db_cursor() as cur:
         cur.execute('SELECT id, name FROM companies ORDER BY name')
         rows = cur.fetchall()
@@ -54,18 +76,37 @@ def list_company_folders() -> list[dict]:
 
 
 def delete_machine(machine_id: str) -> None:
+    """удаляет торговый автомат по id."""
     with db_cursor(commit=True) as cur:
         cur.execute('DELETE FROM vending_machines WHERE id = %s', (machine_id,))
 
 
 def unbind_modem(machine_id: str) -> None:
+    """отвязывает модем от автомата — ставит modem_id = NULL.
+
+    фишка: updated_at = NOW() обновляется автоматически, чтобы было видно
+    когда последний раз менялась запись.
+    """
     with db_cursor(commit=True) as cur:
-        cur.execute('UPDATE vending_machines SET modem_id = NULL, updated_at = NOW() WHERE id = %s', (machine_id,))
+        cur.execute(
+            'UPDATE vending_machines SET modem_id = NULL, updated_at = NOW() WHERE id = %s',
+            (machine_id,),
+        )
 
 
 def upsert_machine(payload: dict) -> str:
+    """создаёт новый та или обновляет существующий.
+
+    фишка: функция называется upsert (update + insert) — сама решает что делать.
+    если в payload есть 'id' — делаем UPDATE, иначе INSERT RETURNING id.
+    RETURNING id — postgresql возвращает uuid только что созданной записи,
+    не нужно делать отдельный SELECT для получения id.
+
+    возвращает uuid автомата в виде строки.
+    """
     machine_id = payload.get('id')
     if machine_id:
+        # id есть — обновляем существующий автомат
         with db_cursor(commit=True) as cur:
             cur.execute(
                 '''
@@ -97,6 +138,7 @@ def upsert_machine(payload: dict) -> str:
             )
         return machine_id
 
+    # id нет — создаём новый автомат
     with db_cursor(commit=True) as cur:
         cur.execute(
             '''

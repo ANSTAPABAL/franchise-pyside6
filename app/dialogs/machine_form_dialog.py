@@ -1,18 +1,34 @@
+"""диалог создания и редактирования торгового автомата.
+
+используется для двух сценариев:
+  - новый та: MachineFormDialog() без аргументов;
+  - редактирование: MachineFormDialog(payload=row) — поля заполняются данными.
+"""
+
 from __future__ import annotations
 
 from datetime import date
 
 from PySide6.QtCore import QDate
-from PySide6.QtWidgets import QCheckBox, QComboBox, QDateEdit, QDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QTextEdit, QVBoxLayout
+from PySide6.QtWidgets import (
+    QCheckBox, QComboBox, QDateEdit, QDialog, QFormLayout,
+    QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QPushButton, QTextEdit, QVBoxLayout,
+)
 
 from services.vending_service import upsert_machine
 
 
 class MachineFormDialog(QDialog):
+    """форма с полями та; по нажатию «создать» отправляет данные в upsert_machine.
+
+    фишка: один диалог работает и для создания, и для редактирования —
+    решается по наличию 'id' в payload. это называется паттерн upsert.
+    """
     def __init__(self, payload: dict | None = None):
         super().__init__()
-        self.payload = payload or {}
-        self.result_id: str | None = None
+        self.payload = payload or {}  # если payload не передан — пустой dict
+        self.result_id: str | None = None  # uuid созданного/обновлённого та
         self.setWindowTitle('Создание торгового автомата')
         self.resize(980, 860)
 
@@ -23,11 +39,12 @@ class MachineFormDialog(QDialog):
 
         grid = QGridLayout()
 
+        # поля ввода — берём значение из payload или ставим дефолт
         self.name = QLineEdit(self.payload.get('name', ''))
         self.manufacturer = QLineEdit(self.payload.get('manufacturer', 'Necta'))
         self.model = QLineEdit(self.payload.get('model', ''))
         self.machine_type = QComboBox()
-        self.machine_type.addItems(['mixed', 'card', 'cash'])
+        self.machine_type.addItems(['mixed', 'card', 'cash'])  # режим работы та
         self.location = QLineEdit(self.payload.get('location', ''))
         self.serial = QLineEdit(self.payload.get('serial_number', ''))
         self.inventory = QLineEdit(self.payload.get('inventory_number', ''))
@@ -35,18 +52,21 @@ class MachineFormDialog(QDialog):
         self.timezone.addItems(['UTC+3', 'UTC+5', 'UTC+7'])
         self.country = QLineEdit(self.payload.get('production_country', 'Россия'))
         self.status = QComboBox()
-        self.status.addItems(['working', 'broken', 'maintenance'])
+        self.status.addItems(['working', 'broken', 'maintenance'])  # статус та
         self.resource_hours = QLineEdit(str(self.payload.get('resource_hours', 10000)))
         self.interval = QLineEdit(str(self.payload.get('verification_interval_months', 12)))
 
+        # поля дат с выпадающим календарём
         self.manufacture_date = QDateEdit(QDate.currentDate())
         self.commissioned_date = QDateEdit(QDate.currentDate())
         self.last_verification = QDateEdit(QDate.currentDate())
-        self.next_service = QDateEdit(QDate.currentDate().addDays(10))
+        self.next_service = QDateEdit(QDate.currentDate().addDays(10))  # через 10 дней по умолчанию
         self.inventory_date = QDateEdit(QDate.currentDate())
-        for d in [self.manufacture_date, self.commissioned_date, self.last_verification, self.next_service, self.inventory_date]:
-            d.setCalendarPopup(True)
+        for d in [self.manufacture_date, self.commissioned_date, self.last_verification,
+                  self.next_service, self.inventory_date]:
+            d.setCalendarPopup(True)  # разрешаем выбор через календарь
 
+        # чекбоксы платёжных систем
         self.payment_cash = QCheckBox('Монетопр.')
         self.payment_cash.setChecked(True)
         self.payment_bill = QCheckBox('Купюропр.')
@@ -56,6 +76,7 @@ class MachineFormDialog(QDialog):
         self.notes.setPlaceholderText('Примечания')
         self.company_id = QLineEdit(self.payload.get('company_id', ''))
 
+        # раскладываем поля по сетке (строка, колонка)
         fields = [
             ('Название ТА *', self.name, 0, 0),
             ('Производитель ТА *', self.manufacturer, 0, 1),
@@ -81,13 +102,14 @@ class MachineFormDialog(QDialog):
             block.addRow(label, widget)
             grid.addLayout(block, row, col)
 
+        # платёжные системы — горизонтальный ряд чекбоксов
         payments = QHBoxLayout()
         payments.addWidget(self.payment_cash)
         payments.addWidget(self.payment_bill)
         payments.addWidget(self.payment_qr)
         pay_form = QFormLayout()
         pay_form.addRow('Платежные системы *', payments)
-        grid.addLayout(pay_form, 6, 0, 1, 3)
+        grid.addLayout(pay_form, 6, 0, 1, 3)  # занимает 3 колонки
 
         notes_form = QFormLayout()
         notes_form.addRow('Примечания', self.notes)
@@ -95,30 +117,45 @@ class MachineFormDialog(QDialog):
 
         root.addLayout(grid)
 
+        # кнопки внизу
         buttons = QHBoxLayout()
         save_btn = QPushButton('Создать')
         cancel_btn = QPushButton('Отменить')
-        cancel_btn.setProperty('variant', 'ghost')
+        cancel_btn.setProperty('variant', 'ghost')  # вторичный стиль кнопки
         save_btn.clicked.connect(self._save)
-        cancel_btn.clicked.connect(self.reject)
+        cancel_btn.clicked.connect(self.reject)  # reject закрывает диалог с кодом 0
         buttons.addWidget(save_btn)
         buttons.addWidget(cancel_btn)
         buttons.addStretch(1)
         root.addLayout(buttons)
 
     def _iso(self, value: QDate) -> str:
+        """преобразует QDate в строку ISO-формата YYYY-MM-DD для SQL.
+
+        postgresql требует даты в формате 'YYYY-MM-DD', поэтому конвертируем.
+        """
         return date(value.year(), value.month(), value.day()).isoformat()
 
     def _save(self):
+        """валидирует форму и сохраняет та в бд через upsert_machine.
+
+        порядок:
+        1. собираем payload из полей формы;
+        2. если числовые поля некорректные — показываем ошибку;
+        3. проверяем обязательные поля (название и серийный номер);
+        4. вызываем upsert_machine — он сам решает: создать или обновить;
+        5. при успехе закрываем диалог через accept().
+        """
         try:
             payload = {
-                'id': self.payload.get('id'),
+                'id': self.payload.get('id'),  # None если новый та
                 'name': self.name.text().strip(),
                 'location': self.location.text().strip(),
                 'model': self.model.text().strip() or 'Unknown',
                 'machine_type': self.machine_type.currentText(),
                 'total_income': float(self.payload.get('total_income', 0) or 0),
                 'serial_number': self.serial.text().strip(),
+                # если инвентарный номер не заполнен — генерируем автоматически
                 'inventory_number': self.inventory.text().strip() or f"INV-{self.serial.text().strip()}",
                 'manufacturer': self.manufacturer.text().strip() or 'Unknown',
                 'manufacture_date': self._iso(self.manufacture_date.date()),
@@ -127,7 +164,7 @@ class MachineFormDialog(QDialog):
                 'verification_interval_months': int(self.interval.text().strip() or '12'),
                 'resource_hours': int(self.resource_hours.text().strip() or '10000'),
                 'next_service_date': self._iso(self.next_service.date()),
-                'service_duration_hours': 4,
+                'service_duration_hours': 4,  # фиксированное значение по умолчанию
                 'status': self.status.currentText(),
                 'production_country': self.country.text().strip() or 'Россия',
                 'inventory_date': self._iso(self.inventory_date.date()),
@@ -135,9 +172,11 @@ class MachineFormDialog(QDialog):
                 'company_id': self.company_id.text().strip() or None,
             }
         except ValueError:
+            # int() или float() упали — пользователь ввёл не число
             QMessageBox.warning(self, 'Ошибка', 'Проверьте числовые поля (ресурс/интервал).')
             return
 
+        # проверяем обязательные поля
         if not payload['name'] or not payload['serial_number']:
             QMessageBox.warning(self, 'Ошибка', 'Название и номер автомата обязательны.')
             return
@@ -147,4 +186,4 @@ class MachineFormDialog(QDialog):
         except Exception as exc:
             QMessageBox.critical(self, 'Ошибка', str(exc))
             return
-        self.accept()
+        self.accept()  # закрываем диалог с кодом Accepted
